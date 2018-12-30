@@ -31,6 +31,7 @@ import Cards from '../../containers/cards.jsx';
 import Alerts from '../../containers/alerts.jsx';
 import DragLayer from '../../containers/drag-layer.jsx';
 import ConnectionModal from '../../containers/connection-modal.jsx';
+import TelemetryModal from '../telemetry-modal/telemetry-modal.jsx';
 
 import layout, {STAGE_SIZE_MODES} from '../../lib/layout-constants';
 import {resolveStageSize} from '../../lib/screen-utils';
@@ -58,6 +59,9 @@ const GUIComponent = props => {
         accountNavOpen,
         activeTabIndex,
         alertsVisible,
+        authorId,
+        authorThumbnailUrl,
+        authorUsername,
         basePath,
         backdropLibraryVisible,
         backpackHost,
@@ -65,10 +69,12 @@ const GUIComponent = props => {
         blocksTabVisible,
         cardsVisible,
         canCreateNew,
+        canEditTitle,
         canRemix,
         canSave,
         canCreateCopy,
         canShare,
+        canUseCloud,
         children,
         connectionModalVisible,
         costumeLibraryVisible,
@@ -76,6 +82,7 @@ const GUIComponent = props => {
         enableCommunity,
         importInfoVisible,
         intl,
+        isCreating,
         isPlayerOnly,
         isRtl,
         isShared,
@@ -90,16 +97,22 @@ const GUIComponent = props => {
         onActivateCostumesTab,
         onActivateSoundsTab,
         onActivateTab,
+        onClickLogo,
         onExtensionButtonClick,
         onRequestCloseBackdropLibrary,
         onRequestCloseCostumeLibrary,
+        onRequestCloseTelemetryModal,
         onSeeCommunity,
         onShare,
+        onTelemetryModalCancel,
+        onTelemetryModalOptIn,
+        onTelemetryModalOptOut,
         previewInfoVisible,
         showComingSoon,
         soundsTabVisible,
         stageSizeMode,
         targetIsStage,
+        telemetryModalVisible,
         tipsLibraryVisible,
         vm,
         ...componentProps
@@ -127,7 +140,9 @@ const GUIComponent = props => {
         return isPlayerOnly ? (
             <StageWrapper
                 isRendererSupported={isRendererSupported}
-                stageSize={stageSize}
+                isRtl={isRtl}
+                loading={loading}
+                stageSize={STAGE_SIZE_MODES.large}
                 vm={vm}
             >
                 {alertsVisible ? (
@@ -143,8 +158,19 @@ const GUIComponent = props => {
                 {previewInfoVisible ? (
                     <PreviewModal />
                 ) : null}
+                {telemetryModalVisible ? (
+                    <TelemetryModal
+                        onCancel={onTelemetryModalCancel}
+                        onOptIn={onTelemetryModalOptIn}
+                        onOptOut={onTelemetryModalOptOut}
+                        onRequestClose={onRequestCloseTelemetryModal}
+                    />
+                ) : null}
                 {loading ? (
                     <Loader />
+                ) : null}
+                {isCreating ? (
+                    <Loader messageId="gui.loader.creating" />
                 ) : null}
                 {importInfoVisible ? (
                     <ImportModal />
@@ -180,8 +206,12 @@ const GUIComponent = props => {
                 ) : null}
                 <MenuBar
                     accountNavOpen={accountNavOpen}
+                    authorId={authorId}
+                    authorThumbnailUrl={authorThumbnailUrl}
+                    authorUsername={authorUsername}
                     canCreateCopy={canCreateCopy}
                     canCreateNew={canCreateNew}
+                    canEditTitle={canEditTitle}
                     canRemix={canRemix}
                     canSave={canSave}
                     canShare={canShare}
@@ -191,6 +221,7 @@ const GUIComponent = props => {
                     renderLogin={renderLogin}
                     showComingSoon={showComingSoon}
                     onClickAccountNav={onClickAccountNav}
+                    onClickLogo={onClickLogo}
                     onCloseAccountNav={onCloseAccountNav}
                     onLogOut={onLogOut}
                     onOpenRegistration={onOpenRegistration}
@@ -262,6 +293,7 @@ const GUIComponent = props => {
                                 <TabPanel className={tabClassNames.tabPanel}>
                                     <Box className={styles.blocksWrapper}>
                                         <Blocks
+                                            canUseCloud={canUseCloud}
                                             grow={1}
                                             isVisible={blocksTabVisible}
                                             options={{
@@ -324,6 +356,9 @@ const GUIComponent = props => {
 GUIComponent.propTypes = {
     accountNavOpen: PropTypes.bool,
     activeTabIndex: PropTypes.number,
+    authorId: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]), // can be false
+    authorThumbnailUrl: PropTypes.string,
+    authorUsername: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]), // can be false
     backdropLibraryVisible: PropTypes.bool,
     backpackHost: PropTypes.string,
     backpackVisible: PropTypes.bool,
@@ -331,9 +366,11 @@ GUIComponent.propTypes = {
     blocksTabVisible: PropTypes.bool,
     canCreateCopy: PropTypes.bool,
     canCreateNew: PropTypes.bool,
+    canEditTitle: PropTypes.bool,
     canRemix: PropTypes.bool,
     canSave: PropTypes.bool,
     canShare: PropTypes.bool,
+    canUseCloud: PropTypes.bool,
     cardsVisible: PropTypes.bool,
     children: PropTypes.node,
     costumeLibraryVisible: PropTypes.bool,
@@ -341,6 +378,7 @@ GUIComponent.propTypes = {
     enableCommunity: PropTypes.bool,
     importInfoVisible: PropTypes.bool,
     intl: intlShape.isRequired,
+    isCreating: PropTypes.bool,
     isPlayerOnly: PropTypes.bool,
     isRtl: PropTypes.bool,
     isShared: PropTypes.bool,
@@ -349,15 +387,20 @@ GUIComponent.propTypes = {
     onActivateSoundsTab: PropTypes.func,
     onActivateTab: PropTypes.func,
     onClickAccountNav: PropTypes.func,
+    onClickLogo: PropTypes.func,
     onCloseAccountNav: PropTypes.func,
     onExtensionButtonClick: PropTypes.func,
     onLogOut: PropTypes.func,
     onOpenRegistration: PropTypes.func,
     onRequestCloseBackdropLibrary: PropTypes.func,
     onRequestCloseCostumeLibrary: PropTypes.func,
+    onRequestCloseTelemetryModal: PropTypes.func,
     onSeeCommunity: PropTypes.func,
     onShare: PropTypes.func,
     onTabSelect: PropTypes.func,
+    onTelemetryModalCancel: PropTypes.func,
+    onTelemetryModalOptIn: PropTypes.func,
+    onTelemetryModalOptOut: PropTypes.func,
     onToggleLoginOpen: PropTypes.func,
     onUpdateProjectTitle: PropTypes.func,
     previewInfoVisible: PropTypes.bool,
@@ -366,6 +409,7 @@ GUIComponent.propTypes = {
     soundsTabVisible: PropTypes.bool,
     stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
     targetIsStage: PropTypes.bool,
+    telemetryModalVisible: PropTypes.bool,
     tipsLibraryVisible: PropTypes.bool,
     vm: PropTypes.instanceOf(VM).isRequired
 };
@@ -374,12 +418,16 @@ GUIComponent.defaultProps = {
     backpackVisible: false,
     basePath: './',
     canCreateNew: false,
+    canEditTitle: false,
     canRemix: false,
     canSave: false,
     canCreateCopy: false,
     canShare: false,
+    canUseCloud: false,
     enableCommunity: false,
+    isCreating: false,
     isShared: false,
+    loading: false,
     onUpdateProjectTitle: () => {},
     showComingSoon: false,
     stageSizeMode: STAGE_SIZE_MODES.large
